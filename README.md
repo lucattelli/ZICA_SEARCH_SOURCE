@@ -5,6 +5,10 @@ ZICA is an acronym for Z Instant Comprehensive ABAP example. It's also a funny s
 
 This example shows you how to use ABAP OO and recursion to lookup for a term inside the source code of any ABAP report, module pool, function pool or subroutine pool as well. The results are shown in an simple ALV output.
 
+![selection screen](https://raw.githubusercontent.com/lucattelli/ZICA_SEARCH_SOURCE/master/img/zica_search_source_ss.png)
+
+![result screen](https://raw.githubusercontent.com/lucattelli/ZICA_SEARCH_SOURCE/master/img/zica_search_source_result.png)
+
 To use ZICA_SEARCH_SOURCE, you'll need to copy it's code to your SAP instance. After that, you can create your own report using the code as below:
 
 ```abap
