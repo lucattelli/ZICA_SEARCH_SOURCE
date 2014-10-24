@@ -1,6 +1,4 @@
-
 REPORT zica_search_source.
-
 *----------------------------------------------------------------------*
 *       CLASS cl_zica_search_source DEFINITION
 *----------------------------------------------------------------------*
@@ -17,30 +15,29 @@ CLASS cl_zica_search_source DEFINITION.
             END OF type_source.
 
 *-- table type for source code
-    TYPES : type_source_tab TYPE TABLE OF type_source.
+    TYPES : type_source_tab TYPE TABLE OF type_source WITH DEFAULT KEY.
 
 *-- result structure, with object, include, line number & content
     TYPES : BEGIN OF type_search_result,
               object TYPE tadir-obj_name,
               include TYPE include.
-    INCLUDE TYPE type_source.
+            INCLUDE TYPE type_source.
     TYPES : END OF type_search_result.
 
 *-- type tabl for search results
-    TYPES : type_search_result_tab TYPE TABLE OF type_search_result.
+    TYPES : type_search_result_tab TYPE TABLE OF type_search_result WITH DEFAULT KEY.
 
 *-- possible program states
     CONSTANTS : BEGIN OF c_prog_states,
                   active VALUE 'A',
                   inactive VALUE 'I',
                 END OF c_prog_states.
-
 *-- class constructor
     METHODS : constructor IMPORTING name TYPE tadir-obj_name.
 
 *-- performs search
     METHODS : search IMPORTING term TYPE type_source-line
-                     CHANGING results TYPE type_search_result_tab.
+                     RETURNING value(results) TYPE type_source_tab.
 
   PRIVATE SECTION.
 
@@ -78,12 +75,12 @@ CLASS cl_zica_search_source DEFINITION.
 
 *-- performs search for a specific include
     METHODS : search_source IMPORTING
-                              object TYPE tadir-obj_name
+                              object  TYPE tadir-obj_name
                               include TYPE tadir-obj_name OPTIONAL
-                              term TYPE type_source-line
-                              source TYPE type_source_tab OPTIONAL
-                            EXPORTING
-                              results TYPE type_search_result_tab.
+                              term    TYPE type_source-line
+                              source  TYPE type_source_tab OPTIONAL
+                            RETURNING
+                              value(results) TYPE type_search_result_tab.
 
 ENDCLASS.                    "cl_zica_search_source DEFINITION
 *----------------------------------------------------------------------*
@@ -101,33 +98,20 @@ CLASS cl_zica_search_source IMPLEMENTATION.
 
   METHOD search.
 
-*-- searches for term inside (this) object's source code
-    DATA : partial_results TYPE type_search_result_tab.
-    CALL METHOD me->search_source
-      EXPORTING
-        object  = me->name
-        term    = term
-      IMPORTING
-        results = partial_results.
-
+*-- searches for term inside (this) object's source code and
 *-- save the partial results to export parameter
-    APPEND LINES OF partial_results[] TO results[].
+    APPEND LINES OF me->search_source( object  = me->name
+                                       term    = term ) TO results.
 
-*-- searches for term inside every include's source code
+*-- searches for term inside every include's source code and
+*-- also save the partial results to export parameter
     DATA : include TYPE REF TO cl_zica_search_source.
     LOOP AT me->includes INTO include.
-      CLEAR partial_results.
-      CALL METHOD me->search_source
-        EXPORTING
+      APPEND LINES OF me->search_source(
           object  = me->name
           include = include->name
           term    = term
-          SOURCE  = include->source[]
-        IMPORTING
-          results = partial_results.
-*-- also save the partial results to export parameter
-      APPEND LINES OF partial_results[] TO results[].
-      CLEAR partial_results.
+          source  = include->source ) TO results.
     ENDLOOP.
 
   ENDMETHOD.                    "search
@@ -151,7 +135,7 @@ CLASS cl_zica_search_source IMPLEMENTATION.
     ENDLOOP.
 
 *-- returns source code table
-    me->source[] = t_source[].
+    me->source = t_source.
 
   ENDMETHOD.                    "fill_source
 
@@ -173,7 +157,7 @@ CLASS cl_zica_search_source IMPLEMENTATION.
         CLEAR condensed_line.
         READ TABLE splitted_line INTO include_name INDEX 2.
         IF sy-subrc IS INITIAL.
-          TRANSLATE include_name TO UPPER CASE.
+          include_name = to_upper( include_name ).
           REPLACE ',' WITH '' INTO include_name.
           REPLACE '.' WITH '' INTO include_name.
           CHECK include_name NE me->c_type AND
@@ -182,8 +166,8 @@ CLASS cl_zica_search_source IMPLEMENTATION.
           CREATE OBJECT include
             EXPORTING
               name = include_name.
-          APPEND include TO me->includes[].
-          APPEND LINES OF include->includes[] TO me->includes[].
+          APPEND include TO me->includes.
+          APPEND LINES OF include->includes TO me->includes.
         ENDIF.
       ENDIF.
     ENDLOOP.
@@ -198,10 +182,10 @@ CLASS cl_zica_search_source IMPLEMENTATION.
 
     IF NOT source[] IS INITIAL.
 *-- if external source is provided, use it (includes)
-      source_to_analyse[] = source[].
+      source_to_analyse = source.
     ELSE.
 *-- if not, use (this) source code
-      source_to_analyse[] = me->source[].
+      source_to_analyse = me->source.
     ENDIF.
 
 *-- extract search results from source code
@@ -243,11 +227,7 @@ START-OF-SELECTION.
 
 *-- searches for term
   DATA res TYPE cl_zica_search_source=>type_search_result_tab.
-  CALL METHOD obj->search
-    EXPORTING
-      term    = p_term
-    CHANGING
-      results = res.
+  res = obj->search( p_term ).
 
 *-- create an instance of a simple ALV for results
   DATA : alv TYPE REF TO cl_salv_table.
